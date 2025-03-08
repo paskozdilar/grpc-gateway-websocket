@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package example;
+
+option go_package = "github.com/paskozdilar/grpc-gateway-websocket/example";
+
+import "google/api/annotations.proto";
+
+
+service ExampleService {
+  rpc Unary (ExampleMessage) returns (ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/Unary";
+      body: "*";
+    };
+  }
+
+  rpc ClientStream (stream ExampleMessage) returns (ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/ClientStream";
+      body: "*";
+    };
+  }
+
+  rpc ServerStream (ExampleMessage) returns (stream ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/ServerStream";
+      body: "*";
+    };
+  }
+
+  rpc Bidirectional (stream ExampleMessage) returns (stream ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/Bidirectional";
+      body: "*";
+    };
+  }
+}
+
+
+message ExampleMessage {
+  string data = 1;
+}
