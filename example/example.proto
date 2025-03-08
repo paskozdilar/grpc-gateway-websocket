@@ -35,6 +35,30 @@ service ExampleService {
       body: "*";
     };
   }
+
+  rpc NoBodyUnary (ExampleMessage) returns (ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/NoBodyUnary";
+    };
+  }
+
+  rpc NoBodyClientStream (stream ExampleMessage) returns (ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/NoBodyClientStream";
+    };
+  }
+
+  rpc NoBodyServerStream (ExampleMessage) returns (stream ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/NoBodyServerStream";
+    };
+  }
+
+  rpc NoBodyBidirectional (stream ExampleMessage) returns (stream ExampleMessage) {
+    option (google.api.http) = {
+      post: "/example/v1/NoBodyBidirectional";
+    };
+  }
 }
 
 

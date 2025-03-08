@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 }
 
 type impl struct {
-	example.UnimplementedExampleServiceServer
+	example.UnsafeExampleServiceServer
 }
 
 func (*impl) Unary(ctx context.Context, req *example.ExampleMessage) (*example.ExampleMessage, error) {
@@ -80,6 +80,48 @@ func (*impl) ServerStream(req *example.ExampleMessage, stream example.ExampleSer
 }
 
 func (*impl) Bidirectional(stream example.ExampleService_BidirectionalServer) error {
+	for {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := stream.Send(&example.ExampleMessage{Data: msg.Data}); err != nil {
+			return err
+		}
+	}
+}
+
+func (*impl) NoBodyUnary(ctx context.Context, _ *example.ExampleMessage) (*example.ExampleMessage, error) {
+	return &example.ExampleMessage{Data: "hello"}, nil
+}
+
+func (*impl) NoBodyClientStream(stream example.ExampleService_NoBodyClientStreamServer) error {
+	var data string
+	for {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			return stream.SendAndClose(&example.ExampleMessage{Data: data})
+		}
+		if err != nil {
+			return err
+		}
+		data = msg.Data
+	}
+}
+
+func (*impl) NoBodyServerStream(_ *example.ExampleMessage, stream example.ExampleService_NoBodyServerStreamServer) error {
+	for i := range 10 {
+		if err := stream.Send(&example.ExampleMessage{Data: fmt.Sprintf("%s %d", "hello", i)}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (*impl) NoBodyBidirectional(stream example.ExampleService_NoBodyBidirectionalServer) error {
 	for {
 		msg, err := stream.Recv()
 		if err == io.EOF {
@@ -294,5 +336,221 @@ func TestBidirectional(t *testing.T) {
 	_, _, err = conn.ReadMessage()
 	if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 		t.Fatalf("conn.ReadMessage() failed: %v, want io.EOF", err)
+	}
+}
+
+func TestNoBodyUnary(t *testing.T) {
+	url := fmt.Sprintf("ws://localhost:%d/example/v1/NoBodyUnary", gatewayPort)
+	done := make(chan error)
+
+	go func() {
+		defer close(done)
+
+		conn, _, err := (&websocket.Dialer{}).Dial(url, nil)
+		if err != nil {
+			done <- fmt.Errorf("websocket.Dialer.Dial() failed: %v, want success", err)
+			return
+		}
+		defer conn.Close()
+
+		err = conn.WriteMessage(websocket.TextMessage, []byte("{}"))
+		if err != nil {
+			done <- fmt.Errorf("conn.WriteMessage() failed: %v, want success", err)
+			return
+		}
+
+		msg := &example.ExampleMessage{}
+		if err := conn.ReadJSON(&msg); err != nil {
+			done <- fmt.Errorf("conn.ReadJSON() failed: %v, want success", err)
+			return
+		}
+		if msg.Data != "hello" {
+			done <- fmt.Errorf("msg.Data = %q, want %q", msg.Data, "hello")
+			return
+		}
+
+		_, _, err = conn.ReadMessage()
+		if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			done <- fmt.Errorf("conn.ReadMessage() failed: %v, want io.EOF", err)
+			return
+		}
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timeout")
+	}
+}
+
+func TestNoBodyClientStream(t *testing.T) {
+	url := fmt.Sprintf("ws://localhost:%d/example/v1/NoBodyClientStream", gatewayPort)
+	done := make(chan error)
+
+	go func() {
+		defer close(done)
+
+		conn, _, err := (&websocket.Dialer{}).Dial(url, nil)
+		if err != nil {
+			done <- fmt.Errorf("websocket.Dialer.Dial() failed: %v, want success", err)
+			return
+		}
+		defer conn.Close()
+
+		for i := range 10 {
+			msg := &example.ExampleMessage{Data: fmt.Sprintf("hello %d", i)}
+			err := conn.WriteJSON(&msg)
+			if err != nil {
+				done <- fmt.Errorf("conn.WriteMessage() failed: %v, want success", err)
+				return
+			}
+		}
+
+		conn.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+		)
+
+		msg := &example.ExampleMessage{}
+		if err := conn.ReadJSON(&msg); err != nil {
+			done <- fmt.Errorf("conn.ReadJSON() failed: %v, want success", err)
+			return
+		}
+		if msg.Data != "hello 9" {
+			done <- fmt.Errorf("msg.Data = %q, want %q", msg.Data, "hello")
+			return
+		}
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timeout")
+	}
+}
+
+func TestNoBodyServerStream(t *testing.T) {
+	url := fmt.Sprintf("ws://localhost:%d/example/v1/NoBodyServerStream", gatewayPort)
+	done := make(chan error)
+
+	go func() {
+		defer close(done)
+
+		conn, _, err := (&websocket.Dialer{}).Dial(url, nil)
+		if err != nil {
+			done <- fmt.Errorf("websocket.Dialer.Dial() failed: %v, want success", err)
+			return
+		}
+		defer conn.Close()
+
+		err = conn.WriteMessage(websocket.TextMessage, []byte("{}"))
+		if err != nil {
+			done <- fmt.Errorf("conn.WriteMessage() failed: %v, want success", err)
+			return
+		}
+
+		// grpc-gateway wraps streaming responses in {"result": ...} JSON
+		type Response struct {
+			Result *example.ExampleMessage
+		}
+
+		for i := range 10 {
+			msg := &example.ExampleMessage{}
+			if err := conn.ReadJSON(&Response{Result: msg}); err != nil {
+				if err == io.EOF {
+					break
+				}
+				done <- fmt.Errorf("conn.ReadJSON() failed: %v, want success", err)
+				return
+			}
+			if msg.Data != fmt.Sprintf("hello %d", i) {
+				done <- fmt.Errorf("msg.Data = %q, want %q", msg.Data, fmt.Sprintf("hello %d", i))
+				return
+			}
+		}
+
+		_, _, err = conn.ReadMessage()
+		if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			done <- fmt.Errorf("conn.ReadMessage() failed: %v, want io.EOF", err)
+			return
+		}
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timeout")
+	}
+}
+
+func TestNoBodyBidirectional(t *testing.T) {
+	url := fmt.Sprintf("ws://localhost:%d/example/v1/NoBodyBidirectional", gatewayPort)
+	done := make(chan error)
+
+	go func() {
+		defer close(done)
+
+		conn, _, err := (&websocket.Dialer{}).Dial(url, nil)
+		if err != nil {
+			done <- fmt.Errorf("websocket.Dialer.Dial() failed: %v, want success", err)
+			return
+		}
+		defer conn.Close()
+
+		for i := range 10 {
+			err := conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"data": "hello %d"}`, i)))
+			if err != nil {
+				done <- fmt.Errorf("conn.WriteMessage() failed: %v, want success", err)
+				return
+			}
+
+			// grpc-gateway wraps streaming responses in {"result": ...} JSON
+			type Response struct {
+				Result *example.ExampleMessage
+			}
+
+			msg := &example.ExampleMessage{}
+			if err := conn.ReadJSON(&Response{Result: msg}); err != nil {
+				done <- fmt.Errorf("conn.ReadJSON() failed: %v, want success", err)
+				return
+			}
+			if msg.Data != fmt.Sprintf("hello %d", i) {
+				done <- fmt.Errorf("msg.Data = %q, want %q", msg.Data, fmt.Sprintf("hello %d", i))
+				return
+			}
+		}
+
+		err = conn.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+		)
+		if err != nil {
+			done <- fmt.Errorf("conn.WriteMessage() failed: %v, want success", err)
+			return
+		}
+
+		_, _, err = conn.ReadMessage()
+		if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			done <- fmt.Errorf("conn.ReadMessage() failed: %v, want io.EOF", err)
+			return
+		}
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timeout")
 	}
 }
