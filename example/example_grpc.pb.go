@@ -19,10 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ExampleService_Unary_FullMethodName         = "/example.ExampleService/Unary"
-	ExampleService_ClientStream_FullMethodName  = "/example.ExampleService/ClientStream"
-	ExampleService_ServerStream_FullMethodName  = "/example.ExampleService/ServerStream"
-	ExampleService_Bidirectional_FullMethodName = "/example.ExampleService/Bidirectional"
+	ExampleService_Unary_FullMethodName               = "/example.ExampleService/Unary"
+	ExampleService_ClientStream_FullMethodName        = "/example.ExampleService/ClientStream"
+	ExampleService_ServerStream_FullMethodName        = "/example.ExampleService/ServerStream"
+	ExampleService_Bidirectional_FullMethodName       = "/example.ExampleService/Bidirectional"
+	ExampleService_NoBodyUnary_FullMethodName         = "/example.ExampleService/NoBodyUnary"
+	ExampleService_NoBodyClientStream_FullMethodName  = "/example.ExampleService/NoBodyClientStream"
+	ExampleService_NoBodyServerStream_FullMethodName  = "/example.ExampleService/NoBodyServerStream"
+	ExampleService_NoBodyBidirectional_FullMethodName = "/example.ExampleService/NoBodyBidirectional"
 )
 
 // ExampleServiceClient is the client API for ExampleService service.
@@ -33,6 +37,10 @@ type ExampleServiceClient interface {
 	ClientStream(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ExampleMessage, ExampleMessage], error)
 	ServerStream(ctx context.Context, in *ExampleMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExampleMessage], error)
 	Bidirectional(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExampleMessage, ExampleMessage], error)
+	NoBodyUnary(ctx context.Context, in *ExampleMessage, opts ...grpc.CallOption) (*ExampleMessage, error)
+	NoBodyClientStream(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ExampleMessage, ExampleMessage], error)
+	NoBodyServerStream(ctx context.Context, in *ExampleMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExampleMessage], error)
+	NoBodyBidirectional(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExampleMessage, ExampleMessage], error)
 }
 
 type exampleServiceClient struct {
@@ -98,6 +106,61 @@ func (c *exampleServiceClient) Bidirectional(ctx context.Context, opts ...grpc.C
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ExampleService_BidirectionalClient = grpc.BidiStreamingClient[ExampleMessage, ExampleMessage]
 
+func (c *exampleServiceClient) NoBodyUnary(ctx context.Context, in *ExampleMessage, opts ...grpc.CallOption) (*ExampleMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExampleMessage)
+	err := c.cc.Invoke(ctx, ExampleService_NoBodyUnary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *exampleServiceClient) NoBodyClientStream(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ExampleMessage, ExampleMessage], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ExampleService_ServiceDesc.Streams[3], ExampleService_NoBodyClientStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExampleMessage, ExampleMessage]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExampleService_NoBodyClientStreamClient = grpc.ClientStreamingClient[ExampleMessage, ExampleMessage]
+
+func (c *exampleServiceClient) NoBodyServerStream(ctx context.Context, in *ExampleMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExampleMessage], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ExampleService_ServiceDesc.Streams[4], ExampleService_NoBodyServerStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExampleMessage, ExampleMessage]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExampleService_NoBodyServerStreamClient = grpc.ServerStreamingClient[ExampleMessage]
+
+func (c *exampleServiceClient) NoBodyBidirectional(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExampleMessage, ExampleMessage], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ExampleService_ServiceDesc.Streams[5], ExampleService_NoBodyBidirectional_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExampleMessage, ExampleMessage]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExampleService_NoBodyBidirectionalClient = grpc.BidiStreamingClient[ExampleMessage, ExampleMessage]
+
 // ExampleServiceServer is the server API for ExampleService service.
 // All implementations must embed UnimplementedExampleServiceServer
 // for forward compatibility.
@@ -106,6 +169,10 @@ type ExampleServiceServer interface {
 	ClientStream(grpc.ClientStreamingServer[ExampleMessage, ExampleMessage]) error
 	ServerStream(*ExampleMessage, grpc.ServerStreamingServer[ExampleMessage]) error
 	Bidirectional(grpc.BidiStreamingServer[ExampleMessage, ExampleMessage]) error
+	NoBodyUnary(context.Context, *ExampleMessage) (*ExampleMessage, error)
+	NoBodyClientStream(grpc.ClientStreamingServer[ExampleMessage, ExampleMessage]) error
+	NoBodyServerStream(*ExampleMessage, grpc.ServerStreamingServer[ExampleMessage]) error
+	NoBodyBidirectional(grpc.BidiStreamingServer[ExampleMessage, ExampleMessage]) error
 	mustEmbedUnimplementedExampleServiceServer()
 }
 
@@ -127,6 +194,18 @@ func (UnimplementedExampleServiceServer) ServerStream(*ExampleMessage, grpc.Serv
 }
 func (UnimplementedExampleServiceServer) Bidirectional(grpc.BidiStreamingServer[ExampleMessage, ExampleMessage]) error {
 	return status.Errorf(codes.Unimplemented, "method Bidirectional not implemented")
+}
+func (UnimplementedExampleServiceServer) NoBodyUnary(context.Context, *ExampleMessage) (*ExampleMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NoBodyUnary not implemented")
+}
+func (UnimplementedExampleServiceServer) NoBodyClientStream(grpc.ClientStreamingServer[ExampleMessage, ExampleMessage]) error {
+	return status.Errorf(codes.Unimplemented, "method NoBodyClientStream not implemented")
+}
+func (UnimplementedExampleServiceServer) NoBodyServerStream(*ExampleMessage, grpc.ServerStreamingServer[ExampleMessage]) error {
+	return status.Errorf(codes.Unimplemented, "method NoBodyServerStream not implemented")
+}
+func (UnimplementedExampleServiceServer) NoBodyBidirectional(grpc.BidiStreamingServer[ExampleMessage, ExampleMessage]) error {
+	return status.Errorf(codes.Unimplemented, "method NoBodyBidirectional not implemented")
 }
 func (UnimplementedExampleServiceServer) mustEmbedUnimplementedExampleServiceServer() {}
 func (UnimplementedExampleServiceServer) testEmbeddedByValue()                        {}
@@ -192,6 +271,49 @@ func _ExampleService_Bidirectional_Handler(srv interface{}, stream grpc.ServerSt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ExampleService_BidirectionalServer = grpc.BidiStreamingServer[ExampleMessage, ExampleMessage]
 
+func _ExampleService_NoBodyUnary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExampleMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ExampleServiceServer).NoBodyUnary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ExampleService_NoBodyUnary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ExampleServiceServer).NoBodyUnary(ctx, req.(*ExampleMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ExampleService_NoBodyClientStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ExampleServiceServer).NoBodyClientStream(&grpc.GenericServerStream[ExampleMessage, ExampleMessage]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExampleService_NoBodyClientStreamServer = grpc.ClientStreamingServer[ExampleMessage, ExampleMessage]
+
+func _ExampleService_NoBodyServerStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExampleMessage)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ExampleServiceServer).NoBodyServerStream(m, &grpc.GenericServerStream[ExampleMessage, ExampleMessage]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExampleService_NoBodyServerStreamServer = grpc.ServerStreamingServer[ExampleMessage]
+
+func _ExampleService_NoBodyBidirectional_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ExampleServiceServer).NoBodyBidirectional(&grpc.GenericServerStream[ExampleMessage, ExampleMessage]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExampleService_NoBodyBidirectionalServer = grpc.BidiStreamingServer[ExampleMessage, ExampleMessage]
+
 // ExampleService_ServiceDesc is the grpc.ServiceDesc for ExampleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -202,6 +324,10 @@ var ExampleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Unary",
 			Handler:    _ExampleService_Unary_Handler,
+		},
+		{
+			MethodName: "NoBodyUnary",
+			Handler:    _ExampleService_NoBodyUnary_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -218,6 +344,22 @@ var ExampleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Bidirectional",
 			Handler:       _ExampleService_Bidirectional_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "NoBodyClientStream",
+			Handler:       _ExampleService_NoBodyClientStream_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "NoBodyServerStream",
+			Handler:       _ExampleService_NoBodyServerStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "NoBodyBidirectional",
+			Handler:       _ExampleService_NoBodyBidirectional_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
