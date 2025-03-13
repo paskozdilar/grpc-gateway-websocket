@@ -379,10 +379,10 @@ func TestNoBodyUnary(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 	case <-time.After(time.Second):
-		t.Fatalf("timeout")
+		t.Fatal("timeout")
 	}
 }
 
@@ -428,10 +428,10 @@ func TestNoBodyClientStream(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 	case <-time.After(time.Second):
-		t.Fatalf("timeout")
+		t.Fatal("timeout")
 	}
 }
 
@@ -485,10 +485,10 @@ func TestNoBodyServerStream(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 	case <-time.After(time.Second):
-		t.Fatalf("timeout")
+		t.Fatal("timeout")
 	}
 }
 
@@ -551,6 +551,6 @@ func TestNoBodyBidirectional(t *testing.T) {
 			t.Fatal(err.Error())
 		}
 	case <-time.After(time.Second):
-		t.Fatalf("timeout")
+		t.Fatal("timeout")
 	}
 }
